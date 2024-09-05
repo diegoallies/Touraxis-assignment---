@@ -1,62 +1,33 @@
-require('dotenv').config(); // Load environment variables from .env file
-const mongoose = require('mongoose');
 const express = require('express');
-const cron = require('node-cron');
-
-// Import routes
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 const userRoutes = require('./routes/user');
 const taskRoutes = require('./routes/task');
 
-// Initialize express app
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON
-app.use(express.json());
-
-// Connect to MongoDB using Mongoose
-async function connectToDatabase() {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    console.log('Connected to MongoDB');
-    
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error('Could not connect to MongoDB', err);
-    process.exit(1); // Exit process with failure
-  }
-}
-
-// Connect to the database and start the server
-connectToDatabase();
+// Middleware to parse JSON bodies
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Use routes
 app.use('/api/users', userRoutes);
-app.use('/api/tasks', taskRoutes);
+app.use('/api/users/:user_id/tasks', taskRoutes); // Ensure the route for tasks is correctly set
 
-// Scheduled job to check pending tasks
-cron.schedule('* * * * *', async () => {
-  try {
-    const collection = mongoose.connection.collection('tasks');
-    
-    const pendingTasks = await collection.find({
-      status: 'pending',
-      next_execute_date_time: { $lt: new Date() }
-    }).toArray();
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://diego:Encrypto27@touraxis-assignment.e1vhb.mongodb.net/mydatabase', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('Could not connect to MongoDB:', err));
 
-    for (const task of pendingTasks) {
-      console.log(`Task "${task.name}" is now complete`);
-      await collection.updateOne(
-        { _id: task._id },
-        { $set: { status: 'done' } }
-      );
-    }
-  } catch (err) {
-    console.error('Error running scheduled task:', err);
-  }
+// Basic error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
 });
+
+// Start server
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on port ${port}`));
