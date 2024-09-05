@@ -19,22 +19,34 @@ router.post('/:user_id/tasks', async (req, res) => {
 
 // List all tasks for a user
 router.get('/:user_id/tasks', async (req, res) => {
-  const tasks = await Task.find({ user: req.params.user_id });
-  res.send(tasks);
+  try {
+    const tasks = await Task.find({ user: req.params.user_id });
+    res.send(tasks);
+  } catch (err) {
+    res.status(400).send(err);
+  }
 });
 
 // Update a task
 router.put('/:user_id/tasks/:task_id', async (req, res) => {
-  const task = await Task.findByIdAndUpdate(req.params.task_id, req.body, { new: true, runValidators: true });
-  if (!task) return res.status(404).send('Task not found');
-  res.send(task);
+  try {
+    const task = await Task.findByIdAndUpdate(req.params.task_id, req.body, { new: true, runValidators: true });
+    if (!task) return res.status(404).send('Task not found');
+    res.send(task);
+  } catch (err) {
+    res.status(400).send(err);
+  }
 });
 
 // Delete a task
 router.delete('/:user_id/tasks/:task_id', async (req, res) => {
-  const task = await Task.findByIdAndDelete(req.params.task_id);
-  if (!task) return res.status(404).send('Task not found');
-  res.send('Task deleted');
+  try {
+    const task = await Task.findByIdAndDelete(req.params.task_id);
+    if (!task) return res.status(404).send('Task not found');
+    res.send('Task deleted');
+  } catch (err) {
+    res.status(400).send(err);
+  }
 });
 
 module.exports = router;

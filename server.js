@@ -1,50 +1,61 @@
-const express = require('express');
+require('dotenv').config(); // Load environment variables from .env file
 const mongoose = require('mongoose');
+const express = require('express');
 const cron = require('node-cron');
 
 // Import routes
 const userRoutes = require('./routes/user');
 const taskRoutes = require('./routes/task');
 
-// Import Task model for the scheduled job
-const Task = require('./models/Task');
-
 // Initialize express app
 const app = express();
-
-// Set the port
 const PORT = process.env.PORT || 3000;
 
 // Middleware to parse JSON
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost/touraxis', { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
+// Connect to MongoDB using Mongoose
+async function connectToDatabase() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     console.log('Connected to MongoDB');
+    
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
-  })
-  .catch(err => console.error('Could not connect to MongoDB', err));
+  } catch (err) {
+    console.error('Could not connect to MongoDB', err);
+    process.exit(1); // Exit process with failure
+  }
+}
 
-// Routes for managing users and tasks
+// Connect to the database and start the server
+connectToDatabase();
+
+// Use routes
 app.use('/api/users', userRoutes);
-app.use('/api/users', taskRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Scheduled job to check pending tasks
 cron.schedule('* * * * *', async () => {
   try {
-    const pendingTasks = await Task.find({
+    const collection = mongoose.connection.collection('tasks');
+    
+    const pendingTasks = await collection.find({
       status: 'pending',
       next_execute_date_time: { $lt: new Date() }
-    });
+    }).toArray();
 
-    pendingTasks.forEach(async (task) => {
+    for (const task of pendingTasks) {
       console.log(`Task "${task.name}" is now complete`);
-      task.status = 'done';
-      await task.save();
-    });
+      await collection.updateOne(
+        { _id: task._id },
+        { $set: { status: 'done' } }
+      );
+    }
   } catch (err) {
     console.error('Error running scheduled task:', err);
   }
